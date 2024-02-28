@@ -95,10 +95,24 @@ def run_single_ebpf_prog():
     else:
         FUZZER_ST_VER_FAIL +=1
 
-    prof_merge_cmd= "bash ./gen_cov.sh " + filename
-    prof_merge_lock.acquire()
-    prof_merge_out = subprocess.run(prof_merge_cmd.split(' '))
-    prof_merge_lock.release()
+    # prof_merge_cmd= "bash ./gen_cov.sh " + filename
+    # prof_merge_lock.acquire()
+    # prof_merge_out = subprocess.run(prof_merge_cmd.split(' '))
+    # prof_merge_lock.release()
+
+    # Mkdir command
+    mkdir_cmd = "mkdir -p tmp/" + filename
+    mkdir_out = subprocess.run(mkdir_cmd.split(' '))
+    # Kcov command
+    kcov_cmd = "kcov tmp/" + filename + "/ ./" + filename + " > /dev/null 2>&1"
+    kcov_out = subprocess.run(kcov_cmd, shell=True)
+    # Kcov merge
+    kcov_merge_cmd = "kcov --merge tmp/merged_cov/ tmp/" + filename + "/"
+    kcov_merge_out = subprocess.run(kcov_merge_cmd.split(' '))
+    # Kcov remove
+    kcov_remove_cmd = "rm -rf tmp/" + filename
+    kcov_remove_out = subprocess.run(kcov_remove_cmd.split(' '))
+    
 
 
     if os.path.exists(filename + ".o"):
@@ -193,10 +207,11 @@ while True:
     
     elapsed_time = round(elapsed_time,0)
     if(elapsed_time % 5 == 0):
-        prof_merge_cmd= "bash ./print_cov.sh "   + str(elapsed_time)
-        prof_merge_lock.acquire()
-        prof_merge_out = subprocess.run(prof_merge_cmd.split(' '))
-        prof_merge_lock.release()
+        # prof_merge_cmd= "bash ./print_cov.sh "   + str(elapsed_time)
+        # prof_merge_lock.acquire()
+        # prof_merge_out = subprocess.run(prof_merge_cmd.split(' '))
+        # prof_merge_lock.release()
+        print("Elapsed time: " + str(elapsed_time))
 
 
     if total_run > MAX_RUN_COUNT:
