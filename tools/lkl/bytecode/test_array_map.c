@@ -162,7 +162,6 @@ int main(void)
 	int prog_fd;
 	long p[3] = { BPF_PROG_LOAD, (long)&attr, sizeof(attr) };
 	prog_fd = lkl_syscall(__lkl__NR_bpf, p);
-	printf("prog_fd: %d\n", prog_fd);
 
 	if (prog_fd < 0) {
 		printf("BPF Verification Failed\n");
@@ -173,6 +172,76 @@ int main(void)
 
 	printf("===== verifier o/p: begin =====\n %s\n============ end ============= \n",
 	       bpf_log_buf);
+
+	// Create a BPF map
+	union bpf_attr map_attr = {
+		.map_type = BPF_MAP_TYPE_ARRAY,
+		.key_size = sizeof(unsigned int),
+		.value_size = sizeof(long),
+		.max_entries = 256,
+	};
+
+	long params[3] = { BPF_MAP_CREATE, (long)&map_attr, sizeof(map_attr) };
+
+	int res = 0;
+
+	res = lkl_syscall(__lkl__NR_bpf, params);
+
+	if (res < 0) {
+		printf("BPF_MAP_CREATE failed: %s\n", strerror(errno));
+		printf("Error: %d\n", res);
+		return -1;
+	}
+
+	printf("Map created successfully\n");
+	printf("Map fd: %d\n", res);
+
+	int new_map_fd = res;
+
+	// Insert a key-value pair into the map
+	unsigned long key = 1;
+	unsigned long value = 123;
+
+	union bpf_attr map_update_attr = {
+		.map_fd = new_map_fd,
+		.key = (unsigned long)&key,
+		.value = (unsigned long)&value,
+		.flags = LKL_BPF_ANY,
+	};
+
+	long params2[3] = { BPF_MAP_UPDATE_ELEM, (long)&map_update_attr,
+			    sizeof(map_update_attr) };
+
+	res = lkl_syscall(__lkl__NR_bpf, params2);
+
+	if (res < 0) {
+		printf("BPF_MAP_UPDATE_ELEM failed: %s\n", strerror(errno));
+		printf("Error: %d\n", res);
+		return -1;
+	}
+
+	printf("Key-value pair inserted successfully\n");
+	printf("Result: %d\n", res);
+
+	// Lookup the key in the map
+	union bpf_attr map_lookup_attr = {
+		.map_fd = new_map_fd,
+		.key = (unsigned long)&key,
+		.value = (unsigned long)&value,
+	};
+
+	long params3[3] = { BPF_MAP_LOOKUP_ELEM, (long)&map_lookup_attr,
+			    sizeof(map_lookup_attr) };
+	res = lkl_syscall(__lkl__NR_bpf, params3);
+
+	if (res < 0) {
+		printf("BPF_MAP_LOOKUP_ELEM failed: %s\n", strerror(errno));
+		printf("Error: %d\n", res);
+		return -1;
+	}
+
+	printf("Key-value pair found successfully\n");
+	printf("Result: %d\n", res);
 
 	/* Attach to socket to run the ebpf program on receiving packet */
 	int sock, ret;

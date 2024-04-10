@@ -18,7 +18,7 @@ from eBPFGenerator import eBPFGenerator
 
 THREAD_COUNT=10
 PRINT_DEBUG=0
-MAX_RUN_COUNT = 50000
+MAX_RUN_COUNT = 5
 elapsed_time=0;
 prof_merge_lock = threading.Lock()
 STOP_FUZZER = False
@@ -69,6 +69,7 @@ def run_single_ebpf_prog():
 
     ebpf_gen = eBPFGenerator()
     random_str = ebpf_gen.generate_instructions(random.randint(2,200) )#to do max_size
+    print(random_str)
     c_contents  = cLoaderProg.LOADER_PROG_HEAD + random_str + cLoaderProg.LOADER_PROG_TAIL
 
     filename = "out_" + hex(random.randint(0xffffff, 0xfffffffffff))[2:]
@@ -110,11 +111,11 @@ def run_single_ebpf_prog():
     kcov_merge_cmd = "kcov --merge tmp/merged_cov/ tmp/" + filename + "/"
     kcov_merge_out = subprocess.run(kcov_merge_cmd.split(' '))
     # Kcov remove
-    kcov_remove_cmd = "rm -rf tmp/" + filename
-    kcov_remove_out = subprocess.run(kcov_remove_cmd.split(' '))
+    # kcov_remove_cmd = "rm -rf tmp/" + filename
+    # kcov_remove_out = subprocess.run(kcov_remove_cmd.split(' '))
     
 
-
+    '''
     if os.path.exists(filename + ".o"):
         os.remove(filename + ".o")
     if os.path.exists(filename + "-in.o"):
@@ -125,6 +126,7 @@ def run_single_ebpf_prog():
         os.remove(filename)
     if os.path.exists(filename + ".profraw"):
         os.remove(filename  + ".profraw" )
+    '''
 
 def _run_single_ebpf_prog():
     
