@@ -205,8 +205,8 @@ int main(void)
 
 	union bpf_attr map_update_attr = {
 		.map_fd = new_map_fd,
-		.key = (unsigned long)&key,
-		.value = (unsigned long)&value,
+		.key = ptr_to_u64(&key),
+		.value = ptr_to_u64(&value),
 		.flags = LKL_BPF_ANY,
 	};
 
@@ -227,8 +227,8 @@ int main(void)
 	// Lookup the key in the map
 	union bpf_attr map_lookup_attr = {
 		.map_fd = new_map_fd,
-		.key = (unsigned long)&key,
-		.value = (unsigned long)&value,
+		.key = ptr_to_u64(&key),
+		.value = ptr_to_u64(&value),
 	};
 
 	long params3[3] = { BPF_MAP_LOOKUP_ELEM, (long)&map_lookup_attr,
@@ -243,6 +243,24 @@ int main(void)
 
 	printf("Key-value pair found successfully\n");
 	printf("Result: %d\n", res);
+
+	// Delete the key-value pair from the map
+	union bpf_attr map_delete_attr = {
+		.map_fd = new_map_fd,
+		.key = ptr_to_u64(&key),
+	};
+
+	long params4[3] = { BPF_MAP_DELETE_ELEM, (long)&map_delete_attr,
+			    sizeof(map_delete_attr) };
+
+	res = lkl_syscall(__lkl__NR_bpf, params4);
+
+	if (res < 0) {
+		printf("BPF_MAP_DELETE_ELEM failed: %s\n", strerror(errno));
+
+		printf("Error: %d\n", res);
+		return -1;
+	}
 
 	/* Attach to socket to run the ebpf program on receiving packet */
 	int sock, ret;
