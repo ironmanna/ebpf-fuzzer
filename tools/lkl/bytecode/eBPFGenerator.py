@@ -6,6 +6,9 @@ import random
 import pprint
 import subprocess
 import sys
+import random
+
+
 
 BPF_EXIT = 0x90
 
@@ -103,6 +106,38 @@ INSN_TYPE_MAX =5
 ST_TYPE_IMM = 0
 ST_TYPE_REG = 1
 
+eBPF_Maps_dict = {
+    0: "BPF_MAP_TYPE_UNSPEC",
+    1: "BPF_MAP_TYPE_HASH",
+    2: "BPF_MAP_TYPE_ARRAY",
+    3: "BPF_MAP_TYPE_PROG_ARRAY",
+    4: "BPF_MAP_TYPE_PERF_EVENT_ARRAY",
+    5: "BPF_MAP_TYPE_PERCPU_HASH",
+    6: "BPF_MAP_TYPE_PERCPU_ARRAY",
+    7: "BPF_MAP_TYPE_STACK_TRACE",
+    8: "BPF_MAP_TYPE_CGROUP_ARRAY",
+    9: "BPF_MAP_TYPE_LRU_HASH",
+    10: "BPF_MAP_TYPE_LRU_PERCPU_HASH",
+    11: "BPF_MAP_TYPE_LPM_TRIE",
+    12: "BPF_MAP_TYPE_ARRAY_OF_MAPS",
+    13: "BPF_MAP_TYPE_HASH_OF_MAPS",
+    14: "BPF_MAP_TYPE_DEVMAP",
+    15: "BPF_MAP_TYPE_SOCKMAP",
+    16: "BPF_MAP_TYPE_CPUMAP",
+    17: "BPF_MAP_TYPE_XSKMAP",
+    18: "BPF_MAP_TYPE_SOCKHASH",
+    19: "BPF_MAP_TYPE_CGROUP_STORAGE",
+    20: "BPF_MAP_TYPE_REUSEPORT_SOCKARRAY",
+    21: "BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE",
+    22: "BPF_MAP_TYPE_QUEUE",
+    23: "BPF_MAP_TYPE_STACK",
+    24: "BPF_MAP_TYPE_SK_STORAGE",
+    25: "BPF_MAP_TYPE_DEVMAP_HASH",
+    26: "BPF_MAP_TYPE_STRUCT_OPS",
+    27: "BPF_MAP_TYPE_RINGBUF",
+    28: "BPF_MAP_TYPE_INODE_STORAGE"
+}
+
 class eBPFGenerator:
 
     reg_init = [None] * 11
@@ -111,6 +146,132 @@ class eBPFGenerator:
         self.random_insn_list = []
         for i  in range(0,11):
             self.reg_init[i] = False;
+    
+    def generate_maps(self, map_number):
+        map_type = eBPF_Maps_dict.get(map_number)
+        array_type = False
+        key = random.randint(0, 2**32 - 1)
+        value = random.randint(0, 2**32 - 1)
+        if map_type == None:
+            map_type = "BPF_MAP_TYPE_UNSPEC"
+        if map_type == "BPF_MAP_TYPE_ARRAY" :
+            array_type = True
+        if array_type:
+            if map_type == "BPF_MAP_TYPE_ARRAY":
+                map_str = "union bpf_attr map_attr = {\n"
+                map_str += ".map_type = " + map_type + ",\n"
+                map_str += ".key_size = sizeof(unsigned int),\n"
+                map_str += ".value_size = sizeof(long),\n"
+                map_str += '.map_name = ptr_to_u64("my_array_map"),\n'
+                map_str += ".max_entries = 256,\n"
+                map_str += "};\n"
+                map_str += "long params[3] = { BPF_MAP_CREATE, (long)&map_attr, sizeof(map_attr) };\n"
+                map_str += "int res = 0;\n"
+                map_str += "res = lkl_syscall(__lkl__NR_bpf, params);\n"
+                map_str += "if(res < 0){\n"
+                map_str += "printf(\"BPF_MAP_CREATE Failed\\n\");\n"
+                map_str += "return 0;\n"
+                map_str += "}\n"
+            if map_type == "BPF_MAP_TYPE_PROG_ARRAY":
+                map_str = "union bpf_attr map_attr = {\n"
+                map_str += ".map_type = " + map_type + ",\n"
+                map_str += ".key_size = 4,\n"
+                map_str += ".value_size = 4,\n"
+                map_str += '.map_name = ptr_to_u64("my_array_map"),\n'
+                map_str += ".max_entries = 256,\n"
+                map_str += "};\n"
+                map_str += "long params[3] = { BPF_MAP_CREATE, (long)&map_attr, sizeof(map_attr) };\n"
+                map_str += "int res = 0;\n"
+                map_str += "res = lkl_syscall(__lkl__NR_bpf, params);\n"
+                map_str += "if(res < 0){\n"
+                map_str += "printf(\"BPF_MAP_CREATE Failed\\n\");\n"
+                map_str += "return 0;\n"
+                map_str += "}\n"
+        else:
+            map_str = "union bpf_attr map_attr = {\n"
+            map_str += ".map_type = " + map_type + ",\n"
+            map_str += ".key_size = sizeof(unsigned long),\n"
+            map_str += ".value_size = sizeof(unsigned long),\n"
+            map_str += '.map_name = ptr_to_u64("my_map"),\n'
+            map_str += ".max_entries = 512,\n"
+            map_str += "};\n"
+            map_str += "long params[3] = { BPF_MAP_CREATE, (long)&map_attr, sizeof(map_attr) };\n"
+            map_str += "int res = 0;\n"
+            map_str += "res = lkl_syscall(__lkl__NR_bpf, params);\n"
+            map_str += "if(res < 0){\n"
+            map_str += "printf(\"BPF_MAP_CREATE Failed\\n\");\n"
+            map_str += "return 0;\n"
+            map_str += "}\n"
+
+        
+        map_str += "int new_map_fd = res;\n"
+        map_str += "\n"
+        map_str += "// Insert a key-value pair into the map\n"
+        map_str += "unsigned long key = " + str(key) +";\n"
+        map_str += "unsigned long value = " + str(value) + ";\n"
+        map_str += "\n"
+        map_str += "union bpf_attr map_update_attr = {\n"
+        map_str += ".map_fd = new_map_fd,\n"
+        map_str += ".key = ptr_to_u64(&key),\n"
+        map_str += ".value = ptr_to_u64(&value),\n"
+        map_str += ".flags = LKL_BPF_ANY,\n"
+        map_str += "};\n"
+        map_str += "\n"
+        map_str += "long params2[3] = { BPF_MAP_UPDATE_ELEM, (long)&map_update_attr,\n"
+        map_str += "sizeof(map_update_attr) };\n"
+        map_str += "\n"
+        map_str += "res = lkl_syscall(__lkl__NR_bpf, params2);\n"
+        map_str += "\n"
+        map_str += "if (res < 0) {\n"
+        map_str += 'printf("BPF_MAP_UPDATE_ELEM failed: %s\\n", strerror(errno));\n'
+        map_str += 'printf("Error: %d\\n", res);\n'
+        map_str += "return 0;\n"
+        map_str += "}\n"
+        map_str += "\n"
+        map_str += 'printf("Key-value pair inserted successfully\\n");\n'
+        map_str += 'printf("Result: %d\\n", res);\n'
+        map_str += "\n"
+        map_str += "// Lookup the key in the map\n"
+        map_str += "union bpf_attr map_lookup_attr = {\n"
+        map_str += ".map_fd = new_map_fd,\n"
+        map_str += ".key = ptr_to_u64(&key),\n"
+        map_str += ".value = ptr_to_u64(&value),\n"
+        map_str += "};\n"
+        map_str += "\n"
+        map_str += "long params3[3] = { BPF_MAP_LOOKUP_ELEM, (long)&map_lookup_attr,\n"
+        map_str += "sizeof(map_lookup_attr) };\n"
+        map_str += "res = lkl_syscall(__lkl__NR_bpf, params3);\n"
+        map_str += "\n"
+        map_str += "if (res < 0) {\n"
+        map_str += 'printf("BPF_MAP_LOOKUP_ELEM failed: %s\\n", strerror(errno));\n'
+        map_str += 'printf("Error: %d\\n", res);\n'
+        map_str += "return 0;\n"
+        map_str += "}\n"
+        map_str += "\n"
+        map_str += 'printf("Key-value pair found successfully\\n");\n'
+        map_str += 'printf("Result: %d\\n", res);\n'
+        map_str += "\n"
+        if not array_type:
+            map_str += "// Delete the key-value pair from the map\n"
+            map_str += "union bpf_attr map_delete_attr = {\n"
+            map_str += ".map_fd = new_map_fd,\n"
+            map_str += ".key = ptr_to_u64(&key),\n"
+            map_str += "};\n"
+            map_str += "\n"
+            map_str += "long params4[3] = { BPF_MAP_DELETE_ELEM, (long)&map_delete_attr,\n"
+            map_str += "sizeof(map_delete_attr) };\n"
+            map_str += "\n"
+            map_str += "res = lkl_syscall(__lkl__NR_bpf, params4);\n"
+            map_str += "\n"
+            map_str += "if (res < 0) {\n"
+            map_str += 'printf("BPF_MAP_DELETE_ELEM failed: %s\\n", strerror(errno));\n'
+            map_str += 'printf("Error: %d\\n", res);\n'
+            map_str += "return 0;\n"
+            map_str += "}\n"
+        return map_str
+
+        
+        
 
     # Returns STR
     def generate_instructions(self, target_insn_len):

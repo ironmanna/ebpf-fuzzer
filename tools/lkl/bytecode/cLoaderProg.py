@@ -147,7 +147,7 @@ int main(void)
 #		BPF_MOV32_IMM(BPF_REG_0, 2),          // R0 = 2
 #		BPF_EXIT_INSN()                       // exit()
 
-LOADER_PROG_TAIL='''
+LOADER_PROG_MID_SECTION='''
 	};
 
 	int insn_cnt = sizeof(prog_valid) / sizeof(struct bpf_insn);
@@ -174,9 +174,9 @@ LOADER_PROG_TAIL='''
 	} else {
 		printf("BPF Verification Passed\\n");
 	}
+'''
 
-
-
+LOADER_PROG_TAIL='''
 	/* Attach to socket to run the ebpf program on receiving packet */
 	int sock,ret;
 	sock = lkl_sys_socket(LKL_AF_INET, LKL_SOCK_STREAM, 0);
