@@ -268,10 +268,7 @@ class eBPFGenerator:
             map_str += 'printf("Error: %d\\n", res);\n'
             map_str += "return 0;\n"
             map_str += "}\n"
-        return map_str
-
-        
-        
+        return map_str       
 
     # Returns STR
     def generate_instructions(self, target_insn_len):

@@ -1,4 +1,4 @@
 out_*
 *.profraw
-tmp/
+Coverage/
 verifier_error.txt
