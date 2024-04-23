@@ -1,0 +1,4 @@
+out_*
+*.profraw
+tmp/
+verifier_error.txt

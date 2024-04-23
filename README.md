@@ -54,7 +54,7 @@ cd tools/lkl/bytecode/
 
 ```bash
 cd tools/lkl/bytecode/
-python3 ebpf_gen.py
+./ebpf_gen.py
 ```
 
 ```
