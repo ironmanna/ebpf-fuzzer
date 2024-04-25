@@ -9,6 +9,7 @@ import time
 import cLoaderProg
 import timeit
 import threading
+import collections
 
 from threading import Thread
 from threading import Condition
@@ -20,16 +21,34 @@ from eBPFGenerator import eBPFGenerator
 
 THREAD_COUNT= 5
 PRINT_DEBUG=0
-MAX_RUN_COUNT = 5
+MAX_RUN_COUNT = 50
 elapsed_time=0
 prof_merge_lock_1 = threading.Lock()
 prof_merge_lock_2 = threading.Lock()
 STOP_FUZZER = False
+THREAD_PENDULUM = False
 
 baseline_cov = {}
 
-good_ebpf_programs = {}
-good_ebpf_map_section = {}
+# Create a new deque for the ebpf programs
+ebpf_program_deque = collections.deque()
+
+# Create a new deque for the ebpf map sections
+ebpf_map_section_deque = collections.deque()
+
+class eBPF_program:
+    def __init__(self, instructions):
+        self.instructions = instructions
+
+    def getInstructions(self):
+        return self.instructions
+    
+class eBPF_map_section:
+    def __init__(self, map_section):
+        self.map_section = map_section
+
+    def getMapSection(self):
+        return self.map_section
 
 def triage_failure(verifier_out):
     file1 = open("verifier_error.txt", "a")  # append mode
@@ -85,8 +104,8 @@ def check_for_improvement_in_coverage(filename):
                 print("Coverage folder: " + coverage_folder)
                 break
     
+    found_something = False
     for files in os.listdir("./Coverage/" + filename + "/" + coverage_folder):
-        found_something = False
         if files.endswith(".js") and not files.startswith(filename):
             file = open("./Coverage/" + filename + "/" + coverage_folder + "/" + files, "r")
             lines = file.readlines()
@@ -99,12 +118,12 @@ def check_for_improvement_in_coverage(filename):
                     prof_merge_lock_1.acquire()
                     if files not in baseline_cov:
                         baseline_cov[files] = coverage_percentage
-                        print("New: " + files + " with coverage: " + str(coverage_percentage))
+                        #print("New: " + files + " with coverage: " + str(coverage_percentage))
                         found_something = True
                     else:
                         if coverage_percentage > baseline_cov[files]:
                             baseline_cov[files] = coverage_percentage
-                            print("Improved on: " + files + " with coverage: " + str(coverage_percentage))
+                            #print("Improved on: " + files + " with coverage: " + str(coverage_percentage))
                             found_something = True
                     prof_merge_lock_1.release()
             file.close()
@@ -164,11 +183,10 @@ def run_single_ebpf_prog():
     found_something = check_for_improvement_in_coverage(filename)
     if found_something:
         #print("Found something!")
-        prof_merge_lock_2.acquire()
-        good_ebpf_programs[random_str] = 1
-        good_ebpf_map_section[maps_str] = 1
-        #print("Good programs: " + str(len(good_programs)))
-        prof_merge_lock_2.release()
+        ebpf_prog = eBPF_program(random_str)
+        ebpf_program_deque.append(ebpf_prog)
+        ebpf_map = eBPF_map_section(maps_str)
+        ebpf_map_section_deque.append(ebpf_map)
     
     # Kcov remove
     kcov_remove_cmd = "rm -rf Coverage/" + filename
@@ -223,12 +241,18 @@ def _run_single_ebpf_prog():
     if os.path.exists(filename):
         os.remove(filename)
 
-def run_heurstic_ebpf_prog(ebpf_instructions):
+def run_heurstic_ebpf_prog( ebpf_instructions : eBPF_program):
 
     ebpf_gen = eBPFGenerator()
-    random_str = ebpf_instructions
+    print("eBPF instructions from deque")
+    random_str = ebpf_gen.ask_gpt3_to_generate_ebpf_program(ebpf_instructions.getInstructions())
+    print("ChatGPT method ended")
     maps_str = ebpf_gen.generate_maps(random.randint(0,28))
-    #print(random_str)
+    
+    print("eBPF instructions from ChatGPT")
+    print(random_str)
+    print("------------END------------")
+
     c_contents  = cLoaderProg.LOADER_PROG_HEAD + random_str + cLoaderProg.LOADER_PROG_MID_SECTION + maps_str + cLoaderProg.LOADER_PROG_TAIL
 
     filename = "out_" + hex(random.randint(0xffffff, 0xfffffffffff))[2:]
@@ -273,19 +297,12 @@ def run_heurstic_ebpf_prog(ebpf_instructions):
     found_something = check_for_improvement_in_coverage(filename)
     if found_something:
         #print("Found something!")
-        prof_merge_lock_2.acquire()
-        good_ebpf_programs.pop(ebpf_instructions)
-        good_ebpf_programs[random_str] = 1
-        good_ebpf_map_section[maps_str] = 1
-        #print("Good programs: " + str(len(good_programs)))
-        prof_merge_lock_2.release()
-    else:
-        prof_merge_lock_2.acquire()
-        good_ebpf_programs[ebpf_instructions] += 1
-        if good_ebpf_programs[ebpf_instructions] > 10:
-            good_ebpf_programs.pop(ebpf_instructions)
-        prof_merge_lock_2.release()
-    
+        ebpf_map = eBPF_map_section(maps_str)
+        ebpf_map_section_deque.append(ebpf_map)
+        new_ebpf_program = eBPF_program(random_str)
+        ebpf_program_deque.append(new_ebpf_program)
+
+
     # Kcov remove
     kcov_remove_cmd = "rm -rf Coverage/" + filename
     kcov_remove_out = subprocess.run(kcov_remove_cmd.split(' '))
@@ -306,8 +323,14 @@ def run_heurstic_ebpf_map_prog(ebpf_map_section):
 
     ebpf_gen = eBPFGenerator()
     random_str = ebpf_gen.generate_instructions(random.randint(2,200) )#to do max_size
-    maps_str = ebpf_map_section
-    #print(random_str)
+    print("Map section from deque")
+    maps_str = ebpf_gen.ask_gpt3_to_generate_map_section(ebpf_map_section)
+    print("ChatGPT method ended")
+    
+    print("Map section from ChatGPT")
+    print(maps_str)
+    print("------------END------------")
+
     c_contents  = cLoaderProg.LOADER_PROG_HEAD + random_str + cLoaderProg.LOADER_PROG_MID_SECTION + maps_str + cLoaderProg.LOADER_PROG_TAIL
 
     filename = "out_" + hex(random.randint(0xffffff, 0xfffffffffff))[2:]
@@ -351,19 +374,10 @@ def run_heurstic_ebpf_map_prog(ebpf_map_section):
 
     found_something = check_for_improvement_in_coverage(filename)
     if found_something:
-        #print("Found something!")
-        prof_merge_lock_2.acquire()
-        good_ebpf_programs[random_str] = 1
-        good_ebpf_map_section.pop(ebpf_map_section)
-        good_ebpf_map_section[maps_str] = 1
-        #print("Good programs: " + str(len(good_programs)))
-        prof_merge_lock_2.release()
-    else:
-        prof_merge_lock_2.acquire()
-        good_ebpf_map_section[ebpf_map_section] += 1
-        if good_ebpf_map_section[ebpf_map_section] > 10:
-            good_ebpf_map_section.pop(ebpf_map_section)
-        prof_merge_lock_2.release()
+        ebpf_program = eBPF_program(random_str)
+        ebpf_program_deque.append(ebpf_program)
+        new_ebpf_map_section = eBPF_map_section(maps_str)
+        ebpf_map_section_deque.append(new_ebpf_map_section)
 
     # Kcov remove
     kcov_remove_cmd = "rm -rf Coverage/" + filename
@@ -381,26 +395,40 @@ def run_heurstic_ebpf_map_prog(ebpf_map_section):
         os.remove(filename  + ".profraw" )
 
 def fuzzer_task(inp):
-    pendulum = False
+    global THREAD_PENDULUM
+
     while STOP_FUZZER !=  True:
+
+        with prof_merge_lock_2:
+            pendulum = THREAD_PENDULUM
+            THREAD_PENDULUM = not THREAD_PENDULUM
+
         if pendulum:
-            if len(good_ebpf_programs) > 0:
-                #do something
-                print("Good programs: " + str(len(good_ebpf_programs)))
-            elif len(good_ebpf_map_section) > 0:
-                #do something
-                print("Good map sections: " + str(len(good_ebpf_map_section)))
+            if ebpf_program_deque:
+                print("First ebpf_program_deque not empty")
+                ebpf_program = ebpf_program_deque.popleft()
+                run_heurstic_ebpf_prog(ebpf_program)
+            elif ebpf_map_section_deque:
+                print("Then ebpf_map_section_deque not empty")
+                ebpf_map_section = ebpf_map_section_deque.popleft()
+                run_heurstic_ebpf_map_prog(ebpf_map_section)
             else:
+                print(pendulum)
                 run_single_ebpf_prog()
         else:
-            if len(good_ebpf_map_section) > 0:
-                #do something
-                print("Good map sections: " + str(len(good_ebpf_map_section)))
-            elif len(good_ebpf_programs) > 0:
-                #do something
-                print("Good programs: " + str(len(good_ebpf_programs)))
+            if ebpf_map_section_deque:
+                print("First ebpf_map_section_deque not empty")
+                ebpf_map_section = ebpf_map_section_deque.popleft()
+                run_heurstic_ebpf_map_prog(ebpf_map_section)
+            elif ebpf_program_deque:
+                print("Then ebpf_program_deque not empty")
+                ebpf_program = ebpf_program_deque.popleft()
+                run_heurstic_ebpf_prog(ebpf_program)
             else:
+                print(pendulum) 
                 run_single_ebpf_prog()
+
+
 
 
 # Main

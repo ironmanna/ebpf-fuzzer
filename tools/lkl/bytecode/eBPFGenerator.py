@@ -7,8 +7,14 @@ import pprint
 import subprocess
 import sys
 import random
+from dotenv import load_dotenv
+from openai import OpenAI
 
+# 
+load_dotenv()
 
+#
+client = OpenAI()
 
 BPF_EXIT = 0x90
 
@@ -661,3 +667,41 @@ class eBPFGenerator:
             return True
 
         return False
+    
+    def ask_gpt3_to_generate_map_section(self,map_section):
+        completion = client.chat.completions.create(
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"this is a valid input, change it a bit to make another valid input: {map_section}. Return the modified input without any additional comment.",
+                }
+            ],
+
+            model="gpt-3.5-turbo",
+        )
+
+        print("ChatGPT Response: ")
+        print(completion.choices[0].message.content)
+        if completion.choices[0].message.content.startswith("```"):
+            return '\n'.join(completion.choices[0].message.content.split('\n')[1:-1])
+        return completion.choices[0].message.content
+    
+    def ask_gpt3_to_generate_ebpf_program(self,ebpf_section):
+        completion = client.chat.completions.create(
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"this is a valid input, change it a bit to make another valid input: {ebpf_section}. Return the modified input without any additional comment.",
+                }
+            ],
+
+            model="gpt-3.5-turbo",
+        )
+
+        print("ChatGPT Response: ")
+        print(completion.choices[0].message.content)
+        if completion.choices[0].message.content.startswith("```"):
+            return '\n'.join(completion.choices[0].message.content.split('\n')[1:-1])
+        return completion.choices[0].message.content
